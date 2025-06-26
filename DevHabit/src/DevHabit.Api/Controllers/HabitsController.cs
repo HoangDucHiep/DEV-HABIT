@@ -1,14 +1,17 @@
+using System.Dynamic;
 using System.Linq.Dynamic.Core;
 using DevHabit.Api.Database;
 using DevHabit.Api.DTOs.Commom;
 using DevHabit.Api.DTOs.Habits;
 using DevHabit.Api.Entities;
+using DevHabit.Api.Services;
 using DevHabit.Api.Services.Sorting;
 using FluentValidation;
 using FluentValidation.Results;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace DevHabit.Api.Controllers;
 
@@ -18,10 +21,11 @@ public sealed class HabitsController(ApplicationDbContext dbContext) : Controlle
 {
 
     [HttpGet]
-    public async Task<ActionResult<PaginationResult<HabitDto>>> GetHabits(
+    public async Task<ActionResult> GetHabits(
         // Searching
         [FromQuery] HabitsQueryParameters query,
-        SortMappingProvider sortMappingProvider
+        SortMappingProvider sortMappingProvider,
+        DataShapingService dataShapingService
     )
     {
         if (!sortMappingProvider.ValidateMappings<HabitDto, Habit>(query.Sort))
@@ -29,6 +33,14 @@ public sealed class HabitsController(ApplicationDbContext dbContext) : Controlle
             return Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 detail: $"The provided sort parameter isn't valid");
+        }
+
+        if (!dataShapingService.Validate<HabitDto>(query.Fields))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                detail: $"The provided fields parameter isn't valid. "
+            );
         }
 
         query.Search = query.Search?.Trim().ToLower();
@@ -52,9 +64,9 @@ public sealed class HabitsController(ApplicationDbContext dbContext) : Controlle
             .Take(query.PageSize)
             .ToListAsync();
 
-        var paginationResult = new PaginationResult<HabitDto>
+        var paginationResult = new PaginationResult<ExpandoObject>
         {
-            Items = habits,
+            Items = dataShapingService.ShapeCollectionData(habits, query.Fields),
             Page = query.Page,
             PageSize = query.PageSize,
             TotalCount = totalCount
@@ -64,15 +76,26 @@ public sealed class HabitsController(ApplicationDbContext dbContext) : Controlle
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<HabitWithTagsDto>> GetHabit([FromRoute] string id)
+    public async Task<IActionResult> GetHabit(
+        [FromRoute] string id, 
+        string? fields,
+        DataShapingService dataShapingService)
     {
+        if (!dataShapingService.Validate<HabitDto>(fields))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                detail: $"The provided fields parameter isn't valid. "
+            );
+        }
+
         HabitWithTagsDto habit = await dbContext
             .Habits
             .Where(h => h.Id == id)
             .Select(HabitQueries.ToHabitWithTagsDto())
             .FirstOrDefaultAsync();
 
-        if (habit == null)
+        if (habit is null)
         {
             return NotFound(new
             {
@@ -80,7 +103,10 @@ public sealed class HabitsController(ApplicationDbContext dbContext) : Controlle
             });
         }
 
-        return Ok(habit);
+        ExpandoObject shapedHabitDto =
+            dataShapingService.ShapeDate(habit, fields);
+
+        return Ok(shapedHabitDto);
     }
 
     [HttpPost]
