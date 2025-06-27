@@ -10,6 +10,7 @@ namespace DevHabit.Api.Controllers;
 [ApiController]
 public class HabitTagsController : ControllerBase
 {
+    public static readonly string Name = nameof(HabitTagsController).Replace("Controller", string.Empty);
     private readonly ApplicationDbContext dbContext;
 
     public HabitTagsController(ApplicationDbContext dbContext)
