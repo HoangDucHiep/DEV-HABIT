@@ -1,10 +1,11 @@
+using DevHabit.Api.DTOs.Commom;
 using DevHabit.Api.Entities;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 
 namespace DevHabit.Api.DTOs.Habits;
 
-public sealed record HabitDto
+public sealed record HabitDto : ILinkResponse
 {
     public required string Id { get; init; }
     public required string Name { get; init; }
@@ -19,4 +20,5 @@ public sealed record HabitDto
     public required DateTime CreatedAtUtc { get; init; }
     public DateTime? UpdatedAtUtc { get; init; }
     public DateTime? LastCompletedAtUtc { get; init; }
+    public List<LinkDto> Links { get; set; }
 }
