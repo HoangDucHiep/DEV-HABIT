@@ -1,4 +1,5 @@
-﻿using DevHabit.Api.Database;
+﻿using Asp.Versioning;
+using DevHabit.Api.Database;
 using DevHabit.Api.DTOs.Habits;
 using DevHabit.Api.Entities;
 using DevHabit.Api.Middlewares;
@@ -20,8 +21,12 @@ namespace DevHabit.Api;
 
 public static class DependencyInjection
 {
-    public static WebApplicationBuilder AddControllers(this WebApplicationBuilder builder)
+    public static WebApplicationBuilder AddApiServices(this WebApplicationBuilder builder)
     {
+        // Add Serialization
+        // 1.options.ReturnHttpNotAcceptable = true - Returns a 406 Not Acceptable status code if a client requests a format that isn't supported.
+        // 2.AddNewtonsoftJson() - Adds Newtonsoft.Json as the JSON serializer(instead of the default System.Text.Json) with camelCase property names(e.g., converting FirstName to firstName in responses).
+        // 3.AddXmlSerializerFormatters() - Enables XML formatting support, so clients can request responses in XML format.
         builder.Services.AddControllers(options =>
             {
                 options.ReturnHttpNotAcceptable = true;
@@ -30,13 +35,46 @@ public static class DependencyInjection
                 new CamelCasePropertyNamesContractResolver())
             .AddXmlSerializerFormatters();
 
+        // 1.	Gets the first NewtonsoftJsonOutputFormatter from the list of output formatters.
+        // 2.	Adds a custom media type CustomMediaTypeNames.Application.HateoasJson (likely something like "application/vnd.hateoas+json") to the supported formats.
+        // 3.	This enables HATEOAS (Hypermedia as the Engine of Application State) responses when clients specifically request this format - allowing your API to return JSON with embedded links for navigation.
         builder.Services.Configure<MvcOptions>(options =>
         {
             NewtonsoftJsonOutputFormatter formatter = options.OutputFormatters
                 .OfType<NewtonsoftJsonOutputFormatter>()
                 .First();
+
+            //formatter.SupportedMediaTypes.Add(CustomMediaTypeNames.Application.Json);
+            formatter.SupportedMediaTypes.Add(CustomMediaTypeNames.Application.JsonV1);
+            formatter.SupportedMediaTypes.Add(CustomMediaTypeNames.Application.JsonV2);
             formatter.SupportedMediaTypes.Add(CustomMediaTypeNames.Application.HateoasJson);
+            formatter.SupportedMediaTypes.Add(CustomMediaTypeNames.Application.HateoasJsonV1);
+            formatter.SupportedMediaTypes.Add(CustomMediaTypeNames.Application.HateoasJsonV2);
         });
+
+        // Versioning
+        // 1.	options.DefaultApiVersion = new ApiVersion(1.0) - Sets the default API version to 1.0 when no specific version is requested.
+        // 2.	options.AssumeDefaultVersionWhenUnspecified = true - When a client doesn't specify a version in their request, the system will use the default version (1.0) rather than returning an error.
+        // 3.	options.ReportApiVersions = true - Adds API version information to response headers, helping clients understand which versions are available.
+        // 4.	options.ApiVersionSelector = new CurrentImplementationApiVersionSelector(options) - When version isn't specified, this selects the current implementation version (rather than always using the minimum supported version).
+        // 5.	options.ApiVersionReader = new UrlSegmentApiVersionReader() - Configures the API to read version information from URL path segments (like /api/v1/resource), rather than from query parameters, headers, or media types.
+        // 6.	.AddMvc() - Registers MVC-specific components needed for API versioning support.
+        builder.Services
+            .AddApiVersioning(options =>
+            {
+                options.DefaultApiVersion = new ApiVersion(1.0);
+                options.AssumeDefaultVersionWhenUnspecified = true;
+                options.ReportApiVersions = true;
+                options.ApiVersionSelector = new CurrentImplementationApiVersionSelector(options);
+
+                //options.ApiVersionReader = new UrlSegmentApiVersionReader();
+                options.ApiVersionReader = ApiVersionReader.Combine(
+                    new MediaTypeApiVersionReader("v"),
+                    new MediaTypeApiVersionReaderBuilder()
+                        .Template("application/vnd.dev-habit.hateoas.{version}+json")
+                        .Build());
+            })
+            .AddMvc();
 
         builder.Services.AddOpenApi();
 
