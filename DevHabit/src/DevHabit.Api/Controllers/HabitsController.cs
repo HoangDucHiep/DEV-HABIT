@@ -1,6 +1,7 @@
 using System.Dynamic;
 using System.Linq.Dynamic.Core;
 using System.Net.Mime;
+using Asp.Versioning;
 using DevHabit.Api.Database;
 using DevHabit.Api.DTOs.Commom;
 using DevHabit.Api.DTOs.Habits;
@@ -18,6 +19,8 @@ namespace DevHabit.Api.Controllers;
 
 [ApiController]
 [Route("habits")]
+[ApiVersion(1.0)]
+[ApiVersion(2.0)]
 public sealed class HabitsController(ApplicationDbContext dbContext, LinkService linkService) : ControllerBase
 {
 
@@ -90,13 +93,14 @@ public sealed class HabitsController(ApplicationDbContext dbContext, LinkService
     }
 
     [HttpGet("{id}")]
+    [MapToApiVersion("1.0")]
     public async Task<IActionResult> GetHabit(
         [FromRoute] string id, 
         string? fields,
         [FromHeader(Name = "Accept")] string? accept,
         DataShapingService dataShapingService)
     {
-        if (!dataShapingService.Validate<HabitDto>(fields))
+        if (!dataShapingService.Validate<HabitWithTagsDto>(fields))
         {
             return Problem(
                 statusCode: StatusCodes.Status400BadRequest,
@@ -131,6 +135,8 @@ public sealed class HabitsController(ApplicationDbContext dbContext, LinkService
 
         return Ok(shapedHabitDto);
     }
+
+
 
     [HttpPost]
     public async Task<ActionResult<HabitDto>> CreateHabit(CreateHabitDto  createHabitDto, IValidator<CreateHabitDto> validator)
@@ -217,6 +223,58 @@ public sealed class HabitsController(ApplicationDbContext dbContext, LinkService
 
         return NoContent();
     }
+
+
+    // V2
+    [HttpGet("{id}")]
+    [MapToApiVersion("2.0")]
+    public async Task<IActionResult> GetHabitV2(
+        [FromRoute] string id,
+        string? fields,
+        [FromHeader(Name = "Accept")] string? accept,
+        DataShapingService dataShapingService)
+    {
+        if (!dataShapingService.Validate<HabitWithTagsDtoV2>(fields))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                detail: $"The provided fields parameter isn't valid. "
+            );
+        }
+
+        HabitWithTagsDtoV2 habit = await dbContext
+            .Habits
+            .Where(h => h.Id == id)
+            .Select(HabitQueries.ToHabitWithTagsDtoV2())
+            .FirstOrDefaultAsync();
+
+        if (habit is null)
+        {
+            return NotFound(new
+            {
+                message = $"Habit with ID '{id}' not found."
+            });
+        }
+
+        ExpandoObject shapedHabitDto =
+            dataShapingService.ShapeData(habit, fields);
+
+        if (accept != CustomMediaTypeNames.Application.HateoasJson)
+        {
+            return Ok(shapedHabitDto);
+        }
+
+        List<LinkDto> links = CreateLinksForHabit(id, fields);
+        shapedHabitDto.TryAdd("links", links);
+
+        return Ok(shapedHabitDto);
+    }
+
+
+
+
+
+
 
     private List<LinkDto> CreateLinksForHabits(
         HabitsQueryParameters parameters,
