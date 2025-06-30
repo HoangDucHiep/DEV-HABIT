@@ -7,6 +7,7 @@ namespace DevHabit.Api.DTOs.Tags;
 public sealed record TagsCollectionDto : ICollectionResponse<TagDto>
 {
     public List<TagDto> Items { get; init; }
+    public List<LinkDto> Links { get; set; } = new List<LinkDto>();
 }
 
 public class TagDto
@@ -16,4 +17,5 @@ public class TagDto
     public string? Description { get; set; }
     public required DateTime CreatedAtUtc { get; set; }
     public DateTime? UpdatedAtUtc { get; set; }
+    public List<LinkDto> Links { get; set; } = new List<LinkDto>();
 }
