@@ -25,6 +25,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseExceptionHandler();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapControllers();
 
 // Fix for S6966: Await RunAsync instead.

@@ -2,6 +2,7 @@
 using DevHabit.Api.DTOs.Auth;
 using DevHabit.Api.DTOs.Users;
 using DevHabit.Api.Entities;
+using DevHabit.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -18,12 +19,13 @@ namespace DevHabit.Api.Controllers;
 public class AuthController(
     UserManager<IdentityUser> userManager,
     ApplicationIdentityDbContext identityDbContext,
-    ApplicationDbContext applicationDbContext
+    ApplicationDbContext applicationDbContext,
+    TokenProvider tokenProvider
     ) : ControllerBase
 {
 
     [HttpPost("register")]
-    public async Task<IActionResult> Register(RegisterUserDto registerUserDto)
+    public async Task<ActionResult<AccessTokensDto>> Register(RegisterUserDto registerUserDto)
     {
         using IDbContextTransaction transaction = await identityDbContext.Database.BeginTransactionAsync();
         applicationDbContext.Database.SetDbConnection(identityDbContext.Database.GetDbConnection());
@@ -64,7 +66,33 @@ public class AuthController(
 
         await transaction.CommitAsync();
 
-        return Ok(user.Id);
+        var tokenRequest = new TokenRequest(identityUser.Id, identityUser.Email);
+
+        AccessTokensDto accessTokens = tokenProvider.Create(tokenRequest);
+
+
+        return Ok(accessTokens);
+    }
+
+    [HttpPost("login")]
+    public async Task<ActionResult<AccessTokensDto>> Login(LoginUserDto loginUserDto)
+    {
+        IdentityUser? identityUser = await userManager.FindByEmailAsync(loginUserDto.Email);
+
+        if (identityUser is null || !await userManager.CheckPasswordAsync(identityUser, loginUserDto.Password))
+        {
+            return Problem(
+                detail: "Invalid email or password",
+                statusCode: StatusCodes.Status401Unauthorized
+            );
+        }
+
+        var tokenRequest = new TokenRequest(identityUser.Id, identityUser.Email!);
+
+        AccessTokensDto accessTokens = tokenProvider.Create(tokenRequest);
+
+
+        return Ok(accessTokens);
     }
 
 }
