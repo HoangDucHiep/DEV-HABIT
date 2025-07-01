@@ -26,6 +26,6 @@ public class UsersController(ApplicationDbContext dbContext) : ControllerBase
             });
         }
 
-        return Ok(User);
+        return Ok(user);
     }
 }

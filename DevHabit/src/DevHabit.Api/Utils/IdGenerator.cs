@@ -10,4 +10,5 @@ public static class IdPrefix
 {
     public const string HABIT = "h_";
     public const string TAG = "t_";
+    public const string USER = "u_";
 }
