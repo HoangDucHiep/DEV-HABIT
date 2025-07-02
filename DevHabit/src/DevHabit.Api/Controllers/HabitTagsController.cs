@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DevHabit.Api.Controllers;
 
-[Authorize]
+[Authorize(Roles = Roles.Member)]
 [Route("habits/{habitId}/tags")]
 [ApiController]
 public class HabitTagsController : ControllerBase

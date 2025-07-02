@@ -36,41 +36,57 @@ public class AuthController(
         applicationDbContext.Database.SetDbConnection(identityDbContext.Database.GetDbConnection());
         await applicationDbContext.Database.UseTransactionAsync(transaction.GetDbTransaction());
 
-        var identityUser = new IdentityUser
-         {
+        var identityUser = new IdentityUser 
+        {
              UserName = registerUserDto.Email,
              Email = registerUserDto.Email
-         };
+        };
 
-         IdentityResult identityResult = await userManager.CreateAsync(identityUser, registerUserDto.Password);
+        IdentityResult identityResult = await userManager.CreateAsync(identityUser, registerUserDto.Password);
 
-         if (!identityResult.Succeeded)
-         {
-             var extensions = new Dictionary<string, object?>
-             {
-                 {
-                     "errors",
-                     identityResult.Errors.ToDictionary(e => e.Code, e => e.Description)
-                 }
-             };
+        if (!identityResult.Succeeded)
+        {
+            var extensions = new Dictionary<string, object?>
+            { 
+                { 
+                    "errors",
+                    identityResult.Errors.ToDictionary(e => e.Code, e => e.Description)
+                }
+            };
 
-             return Problem(
-                 detail: "Unable to register user, please try again",
-                 statusCode: StatusCodes.Status400BadRequest,
-                 extensions: extensions
-             );
-         }
+            return Problem(
+                detail: "Unable to register user, please try again",
+                statusCode: StatusCodes.Status400BadRequest,
+                extensions: extensions
+            );
+        }
 
+        IdentityResult addToRoleResult = await userManager.AddToRoleAsync(identityUser, Roles.Member);
 
-         User user = registerUserDto.ToEntity();
-         user.IdentityId = identityUser.Id;
+        if (!addToRoleResult.Succeeded)
+        {
+            var extensions = new Dictionary<string, object?>
+            { 
+                { 
+                    "errors",
+                    addToRoleResult.Errors.ToDictionary(e => e.Code, e => e.Description)
+                }
+            };
+            return Problem(
+                detail: "Unable to assign role to user, please try again",
+                statusCode: StatusCodes.Status400BadRequest,
+                extensions: extensions
+            );
+        }
+
+        User user = registerUserDto.ToEntity(); 
+        user.IdentityId = identityUser.Id;
 
         applicationDbContext.Users.Add(user);
 
         await applicationDbContext.SaveChangesAsync();
 
-
-        var tokenRequest = new TokenRequest(identityUser.Id, identityUser.Email);
+        var tokenRequest = new TokenRequest(identityUser.Id, identityUser.Email, [Roles.Member]);
         AccessTokensDto accessTokens = tokenProvider.Create(tokenRequest);
 
         var refreshToken = new RefreshToken
@@ -102,7 +118,9 @@ public class AuthController(
             );
         }
 
-        var tokenRequest = new TokenRequest(identityUser.Id, identityUser.Email!);
+        IList<string> roles = await userManager.GetRolesAsync(identityUser);
+
+        var tokenRequest = new TokenRequest(identityUser.Id, identityUser.Email!, roles);
         AccessTokensDto accessTokens = tokenProvider.Create(tokenRequest);
 
         var refreshToken = new RefreshToken
@@ -132,7 +150,9 @@ public class AuthController(
             return Unauthorized();
         }
 
-         var tokenRequest = new TokenRequest(refreshToken.User.Id, refreshToken.User.Email!);
+        IList<string> roles = await userManager.GetRolesAsync(refreshToken.User);
+
+        var tokenRequest = new TokenRequest(refreshToken.User.Id, refreshToken.User.Email!, roles);
         AccessTokensDto accessTokens = tokenProvider.Create(tokenRequest);
 
         refreshToken.Token = accessTokens.RefreshToken;
