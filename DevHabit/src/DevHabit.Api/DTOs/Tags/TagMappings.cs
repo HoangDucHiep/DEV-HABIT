@@ -5,7 +5,7 @@ namespace DevHabit.Api.DTOs.Tags;
 
 public static class TagMappings
 {
-    public static Tag ToEntity(this CreateTagDto dto)
+    public static Tag ToEntity(this CreateTagDto dto, string userId)
     {
         Tag tag = new()
         {
@@ -13,6 +13,7 @@ public static class TagMappings
             Name = dto.Name,
             Description = dto.Description,
             CreatedAtUtc = DateTime.UtcNow,
+            UserId = userId
         };
 
         return tag;

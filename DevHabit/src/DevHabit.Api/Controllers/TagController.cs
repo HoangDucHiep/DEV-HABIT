@@ -25,18 +25,31 @@ public class TagController : ControllerBase
 {
     private readonly ApplicationDbContext dbContext;
     private readonly LinkService linkService;
+    private readonly UserContext userContext;
 
-    public TagController(ApplicationDbContext dbContext, LinkService linkService)
+    public TagController(ApplicationDbContext dbContext, LinkService linkService, UserContext userContext)
     {
         this.dbContext = dbContext;
         this.linkService = linkService;
+        this.userContext = userContext;
     }
 
     [HttpGet]
     public async Task<ActionResult<TagsCollectionDto>> GetTags([FromHeader] AcceptHeaderDto acceptHeader)
     {
+        string? userId = await userContext.GetUserIdAsync();
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new
+            {
+                message = "User is not authenticated."
+            });
+        }
+
         List<TagDto> tags = await dbContext.
             Tags
+            .Where(t => t.UserId == userId)
             .Select(TagQueries.ToTagDto())
             .ToListAsync();
 
@@ -65,11 +78,22 @@ public class TagController : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<TagDto>> GetTag([FromRoute] string id, [FromHeader] AcceptHeaderDto acceptHeader)
     {
+        string? userId = await userContext.GetUserIdAsync();
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new
+            {
+                message = "User is not authenticated."
+            });
+        }
+
         TagDto? tag = await dbContext
             .Tags
-            .Where(t => t.Id == id)
+            .Where(t => t.Id == id && t.UserId == userId)
             .Select(TagQueries.ToTagDto())
             .FirstOrDefaultAsync();
+
         if (tag is null)
         {
             return NotFound(new
@@ -88,12 +112,22 @@ public class TagController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<TagDto>> CreateTag(CreateTagDto createTagDto, IValidator<CreateTagDto> validator)
     {
+        string? userId = await userContext.GetUserIdAsync();
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new
+            {
+                message = "User is not authenticated."
+            });
+        }
+
         // validate the DTO
         await validator.ValidateAndThrowAsync(createTagDto);
 
-        Tag tag = createTagDto.ToEntity();
+        Tag tag = createTagDto.ToEntity(userId);
 
-        if (await dbContext.Tags.AnyAsync(t => t.Name == tag.Name))
+        if (await dbContext.Tags.AnyAsync(t => t.Name == tag.Name && t.UserId == userId))
         {
             return Problem(
                 detail: $"The tag '{tag.Name}' already exists",
@@ -111,9 +145,19 @@ public class TagController : ControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult> UpdateTag(string id, UpdateTagDto updateTagDto)
     {
+        string? userId = await userContext.GetUserIdAsync();
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new
+            {
+                message = "User is not authenticated."
+            });
+        }
+
         Tag? tag = await dbContext
             .Tags
-            .FirstOrDefaultAsync(h => h.Id == id);
+            .FirstOrDefaultAsync(h => h.Id == id && h.UserId == userId);
 
         if (tag is null)
         {
@@ -133,9 +177,20 @@ public class TagController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<ActionResult> DeleteTag(string id)
     {
+        string? userId = await userContext.GetUserIdAsync();
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new
+            {
+                message = "User is not authenticated."
+            });
+        }
+
         Tag? tag = await dbContext
             .Tags
-            .FirstOrDefaultAsync(h => h.Id == id);
+            .FirstOrDefaultAsync(h => h.Id == id && h.UserId == userId);
+
         if (tag is null)
         {
             return NotFound(new
@@ -143,6 +198,7 @@ public class TagController : ControllerBase
                 message = $"Tag with ID '{id}' not found."
             });
         }
+
         dbContext.Tags.Remove(tag);
         await dbContext.SaveChangesAsync();
         return NoContent();

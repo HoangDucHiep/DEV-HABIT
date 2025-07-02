@@ -36,7 +36,7 @@ public static class HabitMappings
     };
 
 
-    public static Habit ToEntity(this CreateHabitDto dto)
+    public static Habit ToEntity(this CreateHabitDto dto, string userId)
     {
         Habit habit = new()
         {
@@ -62,7 +62,8 @@ public static class HabitMappings
                 Target = dto.Milestone.Target,
                 Current = dto.Milestone.Current
             } : null,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = DateTime.UtcNow,
+            UserId = userId
         };
 
         return habit;

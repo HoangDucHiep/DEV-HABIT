@@ -7,4 +7,6 @@ public sealed class Tag
     public string? Description { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? UpdatedAtUtc { get; set; }
+
+    public string UserId { get; set; }
 }

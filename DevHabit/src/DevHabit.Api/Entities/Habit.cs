@@ -18,6 +18,8 @@ public sealed class Habit
 
     public List<HabitTag> HabitTags { get; set; }
     public List<Tag> Tags { get; set; }
+
+    public string UserId { get; set; }
 }
 
 public enum HabitType

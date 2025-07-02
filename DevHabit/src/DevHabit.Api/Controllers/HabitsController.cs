@@ -30,7 +30,11 @@ namespace DevHabit.Api.Controllers;
     CustomMediaTypeNames.Application.HateoasJson,
     CustomMediaTypeNames.Application.HateoasJsonV1,
     CustomMediaTypeNames.Application.HateoasJsonV2)]
-public sealed class HabitsController(ApplicationDbContext dbContext, LinkService linkService) : ControllerBase
+public sealed class HabitsController(
+    ApplicationDbContext dbContext, 
+    LinkService linkService,
+    UserContext userContext  
+    ) : ControllerBase
 {
 
     [HttpGet]
@@ -41,6 +45,16 @@ public sealed class HabitsController(ApplicationDbContext dbContext, LinkService
         DataShapingService dataShapingService
     )
     {
+        string? userId = await userContext.GetUserIdAsync();
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new
+            {
+                message = "User is not authenticated."
+            });
+        }
+
         if (!sortMappingProvider.ValidateMappings<HabitDto, Habit>(query.Sort))
         {
             return Problem(
@@ -61,6 +75,7 @@ public sealed class HabitsController(ApplicationDbContext dbContext, LinkService
         SortMapping[] sortMappings = sortMappingProvider.GetMappings<HabitDto, Habit>();
 
         IQueryable<HabitDto> habitQuery = dbContext.Habits
+            .Where(h=> h.UserId == userId)
             .Where(h => query.Search == null ||
                         h.Name.ToLower().Contains(query.Search) ||
                         h.Description != null && h.Description.ToLower().Contains(query.Search))
@@ -107,6 +122,16 @@ public sealed class HabitsController(ApplicationDbContext dbContext, LinkService
         [FromQuery] HabitsQueryParameters query,
         DataShapingService dataShapingService)
     {
+        string? userId = await userContext.GetUserIdAsync();
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new
+            {
+                message = "User is not authenticated."
+            });
+        }
+
         if (!dataShapingService.Validate<HabitWithTagsDto>(query.Fields))
         {
             return Problem(
@@ -117,7 +142,7 @@ public sealed class HabitsController(ApplicationDbContext dbContext, LinkService
 
         HabitWithTagsDto habit = await dbContext
             .Habits
-            .Where(h => h.Id == id)
+            .Where(h => h.Id == id && h.UserId == userId)
             .Select(HabitQueries.ToHabitWithTagsDto())
             .FirstOrDefaultAsync();
 
@@ -146,10 +171,19 @@ public sealed class HabitsController(ApplicationDbContext dbContext, LinkService
     [HttpPost]
     public async Task<ActionResult<HabitDto>> CreateHabit(CreateHabitDto  createHabitDto, IValidator<CreateHabitDto> validator)
     {
+        string? userId = await userContext.GetUserIdAsync();
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new
+            {
+                message = "User is not authenticated."
+            });
+        }
 
         await validator.ValidateAndThrowAsync(createHabitDto);
 
-        Habit habit = createHabitDto.ToEntity();
+        Habit habit = createHabitDto.ToEntity(userId);
 
         dbContext.Habits.Add(habit);
 
@@ -164,9 +198,19 @@ public sealed class HabitsController(ApplicationDbContext dbContext, LinkService
     [HttpPut("{id}")]
     public async Task<ActionResult> UpdateHabit([FromRoute] string id, UpdateHabitDto updateHabitDto)
     {
+        string? userId = await userContext.GetUserIdAsync();
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new
+            {
+                message = "User is not authenticated."
+            });
+        }
+
         Habit? habit = await dbContext
             .Habits
-            .FirstOrDefaultAsync(h => h.Id == id);
+            .FirstOrDefaultAsync(h => h.Id == id && h.UserId == userId);
 
         if (habit is null)
         {
@@ -184,7 +228,19 @@ public sealed class HabitsController(ApplicationDbContext dbContext, LinkService
     [HttpPatch("{id}")]
     public async Task<ActionResult> PatchHabit(string id, [FromBody] JsonPatchDocument<HabitDto> patchDocument)
     {
-        Habit? habit = await dbContext.Habits.FirstOrDefaultAsync(h => h.Id == id);
+
+        string? userId = await userContext.GetUserIdAsync();
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new
+            {
+                message = "User is not authenticated."
+            });
+        }
+
+        Habit? habit = await dbContext.Habits
+            .FirstOrDefaultAsync(h => h.Id == id && h.UserId == userId);
 
         if (habit is null)
         {
@@ -215,7 +271,18 @@ public sealed class HabitsController(ApplicationDbContext dbContext, LinkService
     [HttpDelete("{id}")]
     public async Task<ActionResult> DeleteHabit(string id)
     {
-        Habit? habit = await dbContext.Habits.FirstOrDefaultAsync(h => h.Id == id);
+        string? userId = await userContext.GetUserIdAsync();
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new
+            {
+                message = "User is not authenticated."
+            });
+        }
+
+        Habit? habit = await dbContext.Habits
+            .FirstOrDefaultAsync(h => h.Id == id && h.UserId == userId);
 
         if (habit is null)
         {
@@ -238,6 +305,17 @@ public sealed class HabitsController(ApplicationDbContext dbContext, LinkService
         [FromQuery] HabitsQueryParameters query,
         DataShapingService dataShapingService)
     {
+
+        string? userId = await userContext.GetUserIdAsync();
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new
+            {
+                message = "User is not authenticated."
+            });
+        }
+
         if (!dataShapingService.Validate<HabitWithTagsDtoV2>(query.Fields))
         {
             return Problem(
@@ -248,7 +326,7 @@ public sealed class HabitsController(ApplicationDbContext dbContext, LinkService
 
         HabitWithTagsDtoV2 habit = await dbContext
             .Habits
-            .Where(h => h.Id == id)
+            .Where(h => h.Id == id && h.UserId == userId)
             .Select(HabitQueries.ToHabitWithTagsDtoV2())
             .FirstOrDefaultAsync();
 
