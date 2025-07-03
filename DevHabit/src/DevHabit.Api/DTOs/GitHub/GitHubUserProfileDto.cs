@@ -1,0 +1,51 @@
+﻿using DevHabit.Api.DTOs.Commom;
+
+namespace DevHabit.Api.DTOs.GitHub;
+
+public sealed record GitHubUserProfileDto(
+    string Login,
+    long Id,
+    string NodeId,
+    Uri AvatarUrl,
+    string GravatarId,
+    Uri Url,
+    Uri HtmlUrl,
+    Uri FollowersUrl,
+    Uri FollowingUrl,
+    Uri GistsUrl,
+    Uri StarredUrl,
+    Uri SubscriptionsUrl,
+    Uri OrganizationsUrl,
+    Uri ReposUrl,
+    Uri EventsUrl,
+    Uri ReceivedEventsUrl,
+    string Type,
+    bool SiteAdmin,
+    string Name,
+    string Company,
+    Uri Blog,
+    string Location,
+    string Email,
+    bool? Hireable,
+    string Bio,
+    string TwitterUsername,
+    long PublicRepos,
+    long PublicGists,
+    long Followers,
+    long Following,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    long PrivateGists,
+    long TotalPrivateRepos,
+    long OwnedPrivateRepos,
+    long DiskUsage,
+    long Collaborators,
+    bool TwoFactorAuthentication,
+    GitHubUserProfilePlanDto Plan,
+    List<LinkDto> Links);
+
+public sealed record GitHubUserProfilePlanDto(
+    string Name,
+    long Space,
+    long PrivateRepos,
+    long Collaborators);
